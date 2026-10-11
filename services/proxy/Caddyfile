@@ -1,0 +1,61 @@
+# Helicone single-origin router for Railway.
+#
+# One public domain serves:
+#   /jawn/*                    -> Jawn (API, LLM proxy at /jawn/v1/gateway/...), prefix stripped
+#                                 (same layout as Helicone's Helm chart ingress: /jawn(/|$)(.*))
+#   /request-response-storage/*, /prompt-body-storage/*, /hql-store/*
+#                              -> SeaweedFS S3 (presigned downloads of request/response bodies)
+#   everything else            -> web dashboard (Next.js)
+# Sign-ups are closed unless HELICONE_ALLOW_SIGNUP=true (the admin account is created by
+# the migrations service). Upstreams come from environment variables.
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	servers {
+		# Railway's edge terminates TLS and sets X-Forwarded-*; trust it so the apps
+		# see the original https scheme and client IP.
+		trusted_proxies static private_ranges 100.0.0.0/8
+		client_ip_headers X-Forwarded-For X-Real-IP
+	}
+}
+
+:{$PORT:8080} {
+	# Liveness of the router itself (Railway healthcheck).
+	handle /_proxy/health {
+		respond "OK" 200
+	}
+
+	# Better Auth email sign-up endpoint: closed unless explicitly enabled.
+	@signup_closed {
+		path /api/auth/sign-up /api/auth/sign-up/*
+		expression `{env.HELICONE_ALLOW_SIGNUP} != "true"`
+	}
+	handle @signup_closed {
+		respond "Sign-up is disabled on this Helicone instance. Ask an admin for an account." 403
+	}
+
+	# Jawn exposes /run-loops/* without authentication outside production mode.
+	@jawn_internal path /jawn/run-loops /jawn/run-loops/*
+	handle @jawn_internal {
+		respond 404
+	}
+
+	handle_path /jawn/* {
+		reverse_proxy {$JAWN_UPSTREAM:jawn.railway.internal:8585} {
+			# LLM responses stream (SSE); flush immediately.
+			flush_interval -1
+		}
+	}
+
+	# Presigned S3 URLs are signed for this public host and forwarded unchanged.
+	@s3 path /request-response-storage/* /prompt-body-storage/* /hql-store/*
+	handle @s3 {
+		reverse_proxy {$S3_UPSTREAM:seaweedfs.railway.internal:8333}
+	}
+
+	handle {
+		reverse_proxy {$WEB_UPSTREAM:web.railway.internal:3000}
+	}
+}

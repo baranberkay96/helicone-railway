@@ -1,0 +1,763 @@
+{
+  "name": "Helicone v2025.08 LLM Observability Gateway",
+  "description": "Proxy, log and monitor every LLM request. Self-hosted with ClickHouse.",
+  "category": "AI/ML",
+  "tags": [
+    "helicone",
+    "llm",
+    "observability",
+    "ai-gateway",
+    "openai",
+    "anthropic",
+    "clickhouse",
+    "monitoring"
+  ],
+  "image": "https://cdn.jsdelivr.net/gh/Helicone/helicone@main/docs/favicon.svg",
+  "upstream": {
+    "repo": "Helicone/helicone",
+    "version": "v2025.08.21-1 (images v2025.08.21)",
+    "checked": "2026-10-11"
+  },
+  "services": {
+    "proxy": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/caddy.svg",
+      "source": {
+        "repo": "baranberkay96/helicone-railway",
+        "rootDirectory": "/services/proxy"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/_proxy/health",
+      "healthcheckTimeout": 120,
+      "restartPolicyType": "ALWAYS",
+      "restartPolicyMaxRetries": null,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": true,
+      "targetPort": 8080,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "8080",
+          "description": "Caddy listen port (public domain target).",
+          "required": false
+        },
+        "WEB_UPSTREAM": {
+          "defaultValue": "${{web.RAILWAY_PRIVATE_DOMAIN}}:3000",
+          "description": "Helicone dashboard (Next.js).",
+          "required": false
+        },
+        "JAWN_UPSTREAM": {
+          "defaultValue": "${{jawn.RAILWAY_PRIVATE_DOMAIN}}:8585",
+          "description": "Jawn API and LLM proxy.",
+          "required": false
+        },
+        "S3_UPSTREAM": {
+          "defaultValue": "${{seaweedfs.RAILWAY_PRIVATE_DOMAIN}}:8333",
+          "description": "SeaweedFS S3 (presigned body downloads).",
+          "required": false
+        },
+        "HELICONE_ALLOW_SIGNUP": {
+          "defaultValue": "false",
+          "description": "Set true to let new users sign up on /signup (they get their own organization). The admin account is created by the migrations service.",
+          "required": false
+        }
+      }
+    },
+    "web": {
+      "icon": "https://cdn.jsdelivr.net/gh/Helicone/helicone@main/docs/favicon.svg",
+      "source": {
+        "image": "helicone/web:v2025.08.21"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/api/hello",
+      "healthcheckTimeout": 1200,
+      "restartPolicyType": "ALWAYS",
+      "restartPolicyMaxRetries": null,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "3000",
+          "description": "Next.js port; Railway healthcheck probes it (/api/hello).",
+          "required": false
+        },
+        "NEXT_PUBLIC_APP_URL": {
+          "defaultValue": "https://${{proxy.RAILWAY_PUBLIC_DOMAIN}}",
+          "description": "Public URL of Helicone (the proxy domain). Change it when you add a custom domain to the proxy.",
+          "required": false
+        },
+        "SITE_URL": {
+          "defaultValue": "${{NEXT_PUBLIC_APP_URL}}",
+          "description": "Public dashboard URL.",
+          "required": false
+        },
+        "BETTER_AUTH_URL": {
+          "defaultValue": "${{NEXT_PUBLIC_APP_URL}}",
+          "description": "Better Auth base URL (must equal the public URL).",
+          "required": false
+        },
+        "BETTER_AUTH_TRUSTED_ORIGINS": {
+          "defaultValue": "${{NEXT_PUBLIC_APP_URL}}",
+          "description": "Origins allowed to call the auth endpoints.",
+          "required": false
+        },
+        "BETTER_AUTH_SECRET": {
+          "defaultValue": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Signs session tokens. Generated once.",
+          "required": false
+        },
+        "NEXT_PUBLIC_BETTER_AUTH": {
+          "defaultValue": "true",
+          "description": "Use Better Auth (self-hosted auth) instead of Supabase auth.",
+          "required": false
+        },
+        "NEXT_PUBLIC_IS_ON_PREM": {
+          "defaultValue": "true",
+          "description": "Self-hosted mode (required off localhost).",
+          "required": false
+        },
+        "NEXT_PUBLIC_HELICONE_JAWN_SERVICE": {
+          "defaultValue": "${{NEXT_PUBLIC_APP_URL}}/jawn",
+          "description": "Jawn URL the browser uses (proxied under /jawn).",
+          "required": false
+        },
+        "NEXT_PUBLIC_API_BASE_PATH": {
+          "defaultValue": "${{NEXT_PUBLIC_APP_URL}}/jawn",
+          "description": "Helicone API base shown in the UI snippets.",
+          "required": false
+        },
+        "NEXT_PUBLIC_BASE_PATH": {
+          "defaultValue": "${{NEXT_PUBLIC_APP_URL}}/jawn/v1/gateway/oai/v1",
+          "description": "OpenAI-compatible proxy base URL shown in the onboarding snippets.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "description": "Postgres (Better Auth and app data).",
+          "required": false
+        },
+        "SUPABASE_DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "description": "Postgres for Helicone's data access layer.",
+          "required": false
+        },
+        "DB_DRIVER": {
+          "defaultValue": "postgres",
+          "description": "Database driver (Helm value).",
+          "required": false
+        },
+        "DB_SSL": {
+          "defaultValue": "disable",
+          "description": "Plain connection on the private network.",
+          "required": false
+        },
+        "DB_HOST": {
+          "defaultValue": "${{Postgres.RAILWAY_PRIVATE_DOMAIN}}",
+          "description": "Postgres host.",
+          "required": false
+        },
+        "DB_PORT": {
+          "defaultValue": "5432",
+          "description": "Postgres port.",
+          "required": false
+        },
+        "DB_USER": {
+          "defaultValue": "${{Postgres.PGUSER}}",
+          "description": "Postgres user (reference).",
+          "required": false
+        },
+        "DB_PASSWORD": {
+          "defaultValue": "${{Postgres.PGPASSWORD}}",
+          "description": "Postgres password (reference).",
+          "required": false
+        },
+        "DB_NAME": {
+          "defaultValue": "${{Postgres.PGDATABASE}}",
+          "description": "Postgres database (reference).",
+          "required": false
+        },
+        "CLICKHOUSE_HOST": {
+          "defaultValue": "http://${{clickhouse.RAILWAY_PRIVATE_DOMAIN}}:8123",
+          "description": "ClickHouse HTTP endpoint.",
+          "required": false
+        },
+        "CLICKHOUSE_USER": {
+          "defaultValue": "default",
+          "description": "ClickHouse user.",
+          "required": false
+        },
+        "CLICKHOUSE_PASSWORD": {
+          "defaultValue": "${{clickhouse.CLICKHOUSE_PASSWORD}}",
+          "description": "ClickHouse password (reference).",
+          "required": false
+        },
+        "S3_ENDPOINT": {
+          "defaultValue": "http://${{seaweedfs.RAILWAY_PRIVATE_DOMAIN}}:8333",
+          "description": "SeaweedFS S3 endpoint (private network).",
+          "required": false
+        },
+        "S3_ACCESS_KEY": {
+          "defaultValue": "${{seaweedfs.AWS_ACCESS_KEY_ID}}",
+          "description": "S3 access key (reference).",
+          "required": false
+        },
+        "S3_SECRET_KEY": {
+          "defaultValue": "${{seaweedfs.AWS_SECRET_ACCESS_KEY}}",
+          "description": "S3 secret key (reference).",
+          "required": false
+        },
+        "S3_BUCKET_NAME": {
+          "defaultValue": "request-response-storage",
+          "description": "Bucket for request/response bodies.",
+          "required": false
+        },
+        "S3_FORCE_PATH_STYLE": {
+          "defaultValue": "true",
+          "description": "SeaweedFS needs path-style requests.",
+          "required": false
+        },
+        "VERCEL_ENV": {
+          "defaultValue": "development",
+          "description": "Must stay development for self-hosting (other values require Supabase TLS certificates).",
+          "required": false
+        },
+        "ENV": {
+          "defaultValue": "development",
+          "description": "Environment label (Helm value).",
+          "required": false
+        },
+        "ENABLE_PROMPT_SECURITY": {
+          "defaultValue": "false",
+          "description": "Prompt-injection model service is not deployed (Helm default).",
+          "required": false
+        },
+        "ENABLE_CRON_JOB": {
+          "defaultValue": "true",
+          "description": "Background loops (alerts, reports) - Helm default.",
+          "required": false
+        },
+        "SMTP_HOST": {
+          "defaultValue": "",
+          "description": "Optional SMTP server for verification and invite emails (outbound SMTP needs Railway Pro).",
+          "required": false
+        },
+        "SMTP_PORT": {
+          "defaultValue": "587",
+          "description": "SMTP port.",
+          "required": false
+        },
+        "SMTP_SECURE": {
+          "defaultValue": "false",
+          "description": "true for implicit TLS (port 465).",
+          "required": false
+        },
+        "SMTP_USER": {
+          "defaultValue": "",
+          "description": "SMTP username.",
+          "required": false
+        },
+        "SMTP_PASS": {
+          "defaultValue": "",
+          "description": "SMTP password.",
+          "required": false
+        },
+        "STRIPE_SECRET_KEY": {
+          "defaultValue": "sk_test_not_used_on_self_hosted",
+          "description": "Placeholder only: billing is not used on a self-hosted instance, but the Stripe client is created at start-up and needs a value (Helm/all-in-one images ship a dummy as well).",
+          "required": false
+        },
+        "OPENAI_API_KEY": {
+          "defaultValue": "sk-",
+          "description": "Placeholder Helicone's Helm chart sets; set a real key only if you want Helicone's own AI helpers. Your apps send their provider keys through the proxy.",
+          "required": false
+        },
+        "AZURE_API_KEY": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets (Azure helper is unused).",
+          "required": false
+        },
+        "AZURE_API_VERSION": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets.",
+          "required": false
+        },
+        "AZURE_DEPLOYMENT_NAME": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets.",
+          "required": false
+        },
+        "AZURE_BASE_URL": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets.",
+          "required": false
+        }
+      }
+    },
+    "jawn": {
+      "icon": "https://cdn.jsdelivr.net/gh/Helicone/helicone@main/docs/favicon.svg",
+      "source": {
+        "image": "helicone/jawn:v2025.08.21"
+      },
+      "startCommand": "yarn serve",
+      "preDeployCommand": null,
+      "healthcheckPath": "/healthcheck",
+      "healthcheckTimeout": 1200,
+      "restartPolicyType": "ALWAYS",
+      "restartPolicyMaxRetries": null,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "8585",
+          "description": "Jawn HTTP port; /healthcheck is the healthcheck.",
+          "required": false
+        },
+        "NEXT_PUBLIC_APP_URL": {
+          "defaultValue": "${{web.NEXT_PUBLIC_APP_URL}}",
+          "description": "Dashboard URL (CORS and links).",
+          "required": false
+        },
+        "SUPABASE_DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "description": "Postgres connection string.",
+          "required": false
+        },
+        "DB_HOST": {
+          "defaultValue": "${{Postgres.RAILWAY_PRIVATE_DOMAIN}}",
+          "description": "Postgres host.",
+          "required": false
+        },
+        "DB_PORT": {
+          "defaultValue": "5432",
+          "description": "Postgres port.",
+          "required": false
+        },
+        "DB_USER": {
+          "defaultValue": "${{Postgres.PGUSER}}",
+          "description": "Postgres user (reference).",
+          "required": false
+        },
+        "DB_PASSWORD": {
+          "defaultValue": "${{Postgres.PGPASSWORD}}",
+          "description": "Postgres password (reference).",
+          "required": false
+        },
+        "DB_NAME": {
+          "defaultValue": "${{Postgres.PGDATABASE}}",
+          "description": "Postgres database (reference).",
+          "required": false
+        },
+        "CLICKHOUSE_HOST": {
+          "defaultValue": "http://${{clickhouse.RAILWAY_PRIVATE_DOMAIN}}:8123",
+          "description": "ClickHouse HTTP endpoint.",
+          "required": false
+        },
+        "CLICKHOUSE_USER": {
+          "defaultValue": "default",
+          "description": "ClickHouse user.",
+          "required": false
+        },
+        "CLICKHOUSE_PASSWORD": {
+          "defaultValue": "${{clickhouse.CLICKHOUSE_PASSWORD}}",
+          "description": "ClickHouse password (reference).",
+          "required": false
+        },
+        "CLICKHOUSE_HQL_USER": {
+          "defaultValue": "hql_user",
+          "description": "Restricted ClickHouse user for HQL (SQL) queries from the UI.",
+          "required": false
+        },
+        "CLICKHOUSE_HQL_PASSWORD": {
+          "defaultValue": "${{migrations.CLICKHOUSE_HQL_PASSWORD}}",
+          "description": "Password the migrations service assigns to hql_user (reference).",
+          "required": false
+        },
+        "S3_ENDPOINT": {
+          "defaultValue": "http://${{seaweedfs.RAILWAY_PRIVATE_DOMAIN}}:8333",
+          "description": "SeaweedFS S3 endpoint for writes (private network).",
+          "required": false
+        },
+        "S3_ENDPOINT_PUBLIC": {
+          "defaultValue": "${{web.NEXT_PUBLIC_APP_URL}}",
+          "description": "Base for presigned URLs given to browsers; the proxy forwards bucket paths to SeaweedFS.",
+          "required": false
+        },
+        "S3_ACCESS_KEY": {
+          "defaultValue": "${{seaweedfs.AWS_ACCESS_KEY_ID}}",
+          "description": "S3 access key (reference).",
+          "required": false
+        },
+        "S3_SECRET_KEY": {
+          "defaultValue": "${{seaweedfs.AWS_SECRET_ACCESS_KEY}}",
+          "description": "S3 secret key (reference).",
+          "required": false
+        },
+        "S3_BUCKET_NAME": {
+          "defaultValue": "request-response-storage",
+          "description": "Bucket for request/response bodies.",
+          "required": false
+        },
+        "S3_PROMPT_BUCKET_NAME": {
+          "defaultValue": "prompt-body-storage",
+          "description": "Bucket for prompt bodies.",
+          "required": false
+        },
+        "HQL_STORE_BUCKET": {
+          "defaultValue": "hql-store",
+          "description": "Bucket for HQL result exports.",
+          "required": false
+        },
+        "BETTER_AUTH_SECRET": {
+          "defaultValue": "${{web.BETTER_AUTH_SECRET}}",
+          "description": "Must match web (validates sessions).",
+          "required": false
+        },
+        "BETTER_AUTH_URL": {
+          "defaultValue": "${{web.NEXT_PUBLIC_APP_URL}}",
+          "description": "Better Auth base URL.",
+          "required": false
+        },
+        "BETTER_AUTH_TRUSTED_ORIGINS": {
+          "defaultValue": "${{web.NEXT_PUBLIC_APP_URL}}",
+          "description": "Trusted origin for auth calls.",
+          "required": false
+        },
+        "NEXT_PUBLIC_BETTER_AUTH": {
+          "defaultValue": "true",
+          "description": "Better Auth mode.",
+          "required": false
+        },
+        "IS_HELICONE_CLOUD": {
+          "defaultValue": "false",
+          "description": "Self-hosted mode (CORS for the dashboard, no cloud features).",
+          "required": false
+        },
+        "HELICONE_WORKER_URL": {
+          "defaultValue": "http://localhost:8585/v1/gateway/oai",
+          "description": "Jawn's own OpenAI proxy route, used by the playground and experiments (all-in-one image value).",
+          "required": false
+        },
+        "VERCEL_ENV": {
+          "defaultValue": "development",
+          "description": "Must stay development for self-hosting (other values require Supabase TLS certificates).",
+          "required": false
+        },
+        "ENV": {
+          "defaultValue": "development",
+          "description": "Environment label (Helm value).",
+          "required": false
+        },
+        "ENABLE_PROMPT_SECURITY": {
+          "defaultValue": "false",
+          "description": "Prompt-security model is not started (Helm default).",
+          "required": false
+        },
+        "ENABLE_CRON_JOB": {
+          "defaultValue": "true",
+          "description": "Run Jawn's background loops (alerts, cleanups).",
+          "required": false
+        },
+        "STRIPE_SECRET_KEY": {
+          "defaultValue": "sk_test_not_used_on_self_hosted",
+          "description": "Placeholder only: billing is not used on a self-hosted instance, but the Stripe client is created at start-up and needs a value (Helm/all-in-one images ship a dummy as well).",
+          "required": false
+        },
+        "OPENAI_API_KEY": {
+          "defaultValue": "sk-",
+          "description": "Placeholder Helicone's Helm chart sets; set a real key only if you want Helicone's own AI helpers. Your apps send their provider keys through the proxy.",
+          "required": false
+        },
+        "AZURE_API_KEY": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets (Azure helper is unused).",
+          "required": false
+        },
+        "AZURE_API_VERSION": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets.",
+          "required": false
+        },
+        "AZURE_DEPLOYMENT_NAME": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets.",
+          "required": false
+        },
+        "AZURE_BASE_URL": {
+          "defaultValue": "anything",
+          "description": "Placeholder Helicone's Helm chart sets.",
+          "required": false
+        },
+        "RAILWAY_DEPLOYMENT_DRAINING_SECONDS": {
+          "defaultValue": "30",
+          "description": "Let in-flight proxied LLM calls finish on redeploy.",
+          "required": false
+        }
+      }
+    },
+    "migrations": {
+      "icon": "https://cdn.jsdelivr.net/gh/Helicone/helicone@main/docs/favicon.svg",
+      "source": {
+        "repo": "baranberkay96/helicone-railway",
+        "rootDirectory": "/services/migrations"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "FLYWAY_URL": {
+          "defaultValue": "jdbc:postgresql://${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/${{Postgres.PGDATABASE}}?sslmode=disable&options=-c%20search_path%3Dpublic,extensions",
+          "description": "JDBC URL for Flyway (Helm chart format).",
+          "required": false
+        },
+        "FLYWAY_USER": {
+          "defaultValue": "${{Postgres.PGUSER}}",
+          "description": "Postgres user (reference).",
+          "required": false
+        },
+        "FLYWAY_PASSWORD": {
+          "defaultValue": "${{Postgres.PGPASSWORD}}",
+          "description": "Postgres password (reference).",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "description": "Postgres connection string for the admin bootstrap.",
+          "required": false
+        },
+        "CLICKHOUSE_HOST": {
+          "defaultValue": "http://${{clickhouse.RAILWAY_PRIVATE_DOMAIN}}:8123",
+          "description": "ClickHouse HTTP endpoint.",
+          "required": false
+        },
+        "CLICKHOUSE_USER": {
+          "defaultValue": "default",
+          "description": "ClickHouse user.",
+          "required": false
+        },
+        "CLICKHOUSE_PASSWORD": {
+          "defaultValue": "${{clickhouse.CLICKHOUSE_PASSWORD}}",
+          "description": "ClickHouse password (reference).",
+          "required": false
+        },
+        "CLICKHOUSE_HQL_PASSWORD": {
+          "defaultValue": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Password set on the restricted hql_user (Helicone's migrations create it without one).",
+          "required": false
+        },
+        "HELICONE_ADMIN_EMAIL": {
+          "defaultValue": "",
+          "description": "Email of the first admin account (created once, email pre-verified).",
+          "required": true
+        },
+        "HELICONE_ADMIN_PASSWORD": {
+          "defaultValue": "${{secret(24, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Password of the first admin account. Generated; read it here and change it after first login.",
+          "required": false
+        },
+        "HELICONE_ADMIN_NAME": {
+          "defaultValue": "Admin",
+          "description": "Display name of the first admin.",
+          "required": false
+        },
+        "HELICONE_ORG_NAME": {
+          "defaultValue": "My Organization",
+          "description": "Name of the admin's organization.",
+          "required": false
+        }
+      }
+    },
+    "clickhouse": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/clickhouse.svg",
+      "source": {
+        "repo": "baranberkay96/helicone-railway",
+        "rootDirectory": "/services/clickhouse"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/ping",
+      "healthcheckTimeout": 300,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/var/lib/clickhouse"
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "8123",
+          "description": "HTTP port; /ping is the healthcheck.",
+          "required": false
+        },
+        "CLICKHOUSE_PASSWORD": {
+          "defaultValue": "${{secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Password of the default (admin) user.",
+          "required": false
+        },
+        "RAILWAY_DEPLOYMENT_DRAINING_SECONDS": {
+          "defaultValue": "60",
+          "description": "Let ClickHouse flush and stop cleanly.",
+          "required": false
+        }
+      }
+    },
+    "Postgres": {
+      "icon": "https://devicons.railway.app/i/postgresql.svg",
+      "source": {
+        "image": "ghcr.io/railwayapp-templates/postgres-ssl:17"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/var/lib/postgresql/data"
+      },
+      "variables": {
+        "PGDATA": {
+          "defaultValue": "/var/lib/postgresql/data/pgdata",
+          "description": "Location where the database will be initialized",
+          "required": false
+        },
+        "PGHOST": {
+          "defaultValue": "${{RAILWAY_PRIVATE_DOMAIN}}",
+          "description": "Railway Private Domain Name.",
+          "required": false
+        },
+        "PGPORT": {
+          "defaultValue": "5432",
+          "description": "Port to connect to Postgres.",
+          "required": false
+        },
+        "PGUSER": {
+          "defaultValue": "${{ POSTGRES_USER }}",
+          "description": "Required variable for Data panel",
+          "required": false
+        },
+        "PGDATABASE": {
+          "defaultValue": "${{POSTGRES_DB}}",
+          "description": "Required variable for the data panel.",
+          "required": false
+        },
+        "PGPASSWORD": {
+          "defaultValue": "${{POSTGRES_PASSWORD}}",
+          "description": "Required variable for Data panel",
+          "required": false
+        },
+        "POSTGRES_DB": {
+          "defaultValue": "helicone",
+          "description": "Default database created when image is started.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "postgresql://${{PGUSER}}:${{POSTGRES_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:5432/${{PGDATABASE}}",
+          "description": "URL to connect to Postgres database.",
+          "required": false
+        },
+        "POSTGRES_USER": {
+          "defaultValue": "postgres",
+          "description": "User to connect to Postgres DB",
+          "required": false
+        },
+        "SSL_CERT_DAYS": {
+          "defaultValue": "820",
+          "description": "SSL certificate expiry in days.",
+          "required": false
+        },
+        "POSTGRES_PASSWORD": {
+          "defaultValue": "${{ secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\") }}",
+          "description": "Password to connect to DB",
+          "required": false
+        },
+        "RAILWAY_DEPLOYMENT_DRAINING_SECONDS": {
+          "defaultValue": "60",
+          "description": "Allow Postgres to cleanly shut down",
+          "required": false
+        }
+      }
+    },
+    "seaweedfs": {
+      "icon": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/svg/seaweedfs.svg",
+      "source": {
+        "repo": "baranberkay96/helicone-railway",
+        "rootDirectory": "/services/seaweedfs"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/healthz",
+      "healthcheckTimeout": 300,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/data"
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "8333",
+          "description": "S3 port; /healthz is the healthcheck.",
+          "required": false
+        },
+        "S3_PORT": {
+          "defaultValue": "8333",
+          "description": "S3 gateway port.",
+          "required": false
+        },
+        "S3_BUCKETS": {
+          "defaultValue": "request-response-storage,prompt-body-storage,hql-store",
+          "description": "Buckets created at start (idempotent).",
+          "required": false
+        },
+        "AWS_ACCESS_KEY_ID": {
+          "defaultValue": "${{secret(20, \"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "S3 access key (admin identity).",
+          "required": false
+        },
+        "AWS_SECRET_ACCESS_KEY": {
+          "defaultValue": "${{secret(40, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "S3 secret key.",
+          "required": false
+        },
+        "RAILWAY_DEPLOYMENT_DRAINING_SECONDS": {
+          "defaultValue": "30",
+          "description": "Clean shutdown on redeploy.",
+          "required": false
+        }
+      }
+    }
+  }
+}

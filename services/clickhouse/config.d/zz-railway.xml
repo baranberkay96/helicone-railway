@@ -1,0 +1,43 @@
+<!--
+  Railway overrides for the single-node ClickHouse behind Helicone.
+  Smaller caches than the server defaults (which assume a large dedicated host),
+  high-churn system log tables disabled, short TTLs on the useful ones, logs to stdout.
+  Listening on :: and 0.0.0.0 comes from the image's docker_related_config.xml.
+-->
+<clickhouse>
+    <mark_cache_size>536870912</mark_cache_size>               <!-- 512 MiB -->
+    <index_mark_cache_size>134217728</index_mark_cache_size>   <!-- 128 MiB -->
+    <uncompressed_cache_size>134217728</uncompressed_cache_size>
+    <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+
+    <!-- Warnings and above, also to stdout for Railway logs; file logs stay small. -->
+    <logger>
+        <level>warning</level>
+        <console>1</console>
+        <size>100M</size>
+        <count>3</count>
+    </logger>
+
+    <trace_log remove="1"/>
+    <text_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <query_views_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <session_log remove="1"/>
+
+    <query_log replace="1">
+        <database>system</database>
+        <table>query_log</table>
+        <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY DELETE</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_log>
+    <part_log replace="1">
+        <database>system</database>
+        <table>part_log</table>
+        <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY DELETE</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
+</clickhouse>
